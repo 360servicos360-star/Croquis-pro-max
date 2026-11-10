@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Croqui de Localização</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --ink:#0E2433; --paper:#F5F2EA; --card:#FFFFFF; --line:#D8D2C4; --muted:#5E6B73;
+  --accent:#D9480F; --accent-ink:#FFFFFF; --ok:#1B6B4A; --err:#9B1C1C; --olive:#5E7F1B;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+
+/* ---------- barra superior ---------- */
+.topbar{position:sticky;top:0;z-index:1000;background:var(--ink);color:#fff;display:flex;flex-wrap:wrap;
+  gap:8px 16px;align-items:center;justify-content:space-between;padding:10px 16px}
+.brand b{display:block;font:700 1.15rem/1.2 Georgia,"Times New Roman",serif}
+.brand span{font-size:.82rem;opacity:.75}
+.topbar nav{display:flex;gap:8px;align-items:center}
+.topbar a{color:#fff;text-decoration:none;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.35);font-size:.92rem}
+.topbar button{min-height:40px}
+
+/* ---------- estrutura ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+@media (min-width:1150px){
+  .layout{grid-template-columns:440px minmax(0,1fr);align-items:start}
+  .panel{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto}
+}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 14px 14px;min-width:0}
+.intro{margin:10px 0 8px;color:var(--muted);font-size:.92rem}
+details{border-top:1px solid var(--line);padding:2px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:700;padding:12px 0;min-height:48px;display:flex;align-items:center;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";display:inline-block;width:22px;color:var(--accent);font-weight:700}
+details[open]>summary::before{content:"−"}
+details details{border-top:0;margin-top:8px}
+details details summary{font-weight:600;font-size:.9rem;min-height:40px;padding:6px 0}
+.g{padding:0 0 12px}
+label{display:block;font-weight:600;font-size:.92rem;margin:10px 0 4px}
+.hint{color:var(--muted);font-size:.84rem;margin:4px 0 0}
+.warn{background:#FFF4E5;border:1px solid #F0C48A;border-radius:9px;padding:8px 10px;font-size:.84rem;margin-top:8px}
+input[type=text],select,textarea{width:100%;min-height:46px;padding:9px 11px;font:inherit;color:var(--ink);
+  background:#FBFAF6;border:1px solid var(--line);border-radius:9px}
+textarea{min-height:90px;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 70px;gap:8px}
+.rowd{display:grid;grid-template-columns:96px 1fr;gap:8px;margin-top:8px;align-items:center}
+.rowd span{font-weight:600;font-size:.88rem}
+button{min-height:46px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);
+  font:inherit;font-weight:700;cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.sm{min-height:40px;padding:6px 10px;font-size:.88rem}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btnrow>*{flex:1 1 auto}
+.readout{background:#F0EEE6;border-radius:9px;padding:10px 12px;margin-top:10px;font:.84rem/1.6 ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.readout b{font-family:system-ui,sans-serif;display:inline-block;min-width:86px}
+.msg{font-size:.88rem;margin:8px 0 0;min-height:1.2em}
+.msg.bad{color:var(--err)} .msg.ok{color:var(--ok)}
+.li{display:flex;gap:8px;align-items:center;margin-top:8px}
+.li .tag{flex:0 0 38px;text-align:center;font-weight:700;font-size:.82rem;background:var(--ink);color:#fff;border-radius:6px;padding:6px 0}
+.li .coord{flex:1;font:.8rem ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.li input{flex:1}
+.li button{min-height:40px;min-width:40px;padding:4px 8px}
+.chk{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin:10px 0 0}
+.chk input{width:22px;height:22px;margin-top:2px;accent-color:var(--accent)}
+
+/* ---------- folha ---------- */
+.sheetwrap{min-width:0;overflow-x:auto;padding-bottom:6px}
+.sheet{background:#fff;color:#111;border:1px solid var(--line);border-radius:4px;padding:22px;max-width:780px;margin:0 auto;
+  font:13px/1.5 Georgia,"Times New Roman",serif;box-shadow:0 2px 14px rgba(14,36,51,.08)}
+.sheet[data-fmt="topo"]{width:703px;max-width:none;padding:0;border:2px solid #111}
+.s-cab{text-align:center;font-weight:700;font-size:.95rem;margin:8px 8px;text-transform:uppercase}
+.t-head{display:flex;align-items:center;justify-content:center;gap:12px}
+.t-head svg{display:none}
+.s-title{margin:0;text-align:center;font:700 1.35rem/1.2 Georgia,serif;letter-spacing:.03em}
+.sheet[data-fmt="topo"] .t-head{background:var(--olive);padding:10px 12px;justify-content:flex-start;border-bottom:2px solid #111}
+.sheet[data-fmt="topo"] .t-head svg{display:block;flex:0 0 auto}
+.sheet[data-fmt="topo"] .s-title{background:#fff;color:#111;font:400 2.1rem/1.1 Arial,Helvetica,sans-serif;padding:4px 14px;letter-spacing:0;flex:1}
+.s-sub{margin:4px 0 14px;text-align:center;font-size:1.02rem}
+.sheet[data-fmt="topo"] .s-sub{display:none}
+.s-h{margin:16px 0 6px;font:700 .98rem/1.3 Georgia,serif;border-bottom:2px solid #111;padding-bottom:3px}
+.sheet table{width:100%;border-collapse:collapse;font:12px/1.4 system-ui,sans-serif}
+.sheet th,.sheet td{border:1px solid #888;padding:4px 6px;text-align:left;vertical-align:top}
+.sheet th{background:#EEE;font-weight:700}
+.sheet td.k{width:34%;background:#F6F6F6;font-weight:600}
+.sheet td.n{white-space:nowrap;font-variant-numeric:tabular-nums}
+.datumtxt{margin:0;padding:5px 8px;text-align:center;font:600 12px system-ui,sans-serif;color:#fff;background:#3C5B7A}
+.sheet[data-fmt="simples"] .datumtxt{background:#3C5B7A}
+.mem p{margin:0 0 8px;text-align:justify}
+.sheet[data-fmt="topo"] #blkMem{padding:14px 16px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font:11.5px/1.4 system-ui,sans-serif;margin:6px 0 0;color:#222}
+.sheet[data-fmt="topo"] .legend{padding:4px 10px;margin:0;border-top:1px solid #111;background:#fafafa}
+.legend i{display:inline-block;vertical-align:middle;margin-right:5px}
+.lg-pin{width:12px;height:12px;border-radius:50%;background:#C00;border:2px solid #fff;box-shadow:0 0 0 1px #333}
+.lg-ref{width:16px;height:11px;border-radius:3px;background:#0E2433}
+.lg-poly{width:16px;height:11px;background:rgba(217,72,15,.25);border:2px solid #D9480F}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:34px;font:12px/1.4 system-ui,sans-serif;text-align:center}
+.sign .line{border-top:1px solid #111;margin-top:46px;padding-top:4px}
+.sign small{display:block;color:#444}
+.s-date{margin-top:20px;font:12px system-ui,sans-serif;text-align:right}
+.empty{color:#777;font-style:italic}
+
+/* ---------- carimbo (formato topográfico) ---------- */
+.carimbo{border-top:2px solid #111;font:12px/1.35 Arial,Helvetica,sans-serif;color:#111}
+.cb-row1{display:grid;grid-template-columns:176px 176px 1fr;border-bottom:2px solid #111}
+.cb-row2{display:grid;grid-template-columns:1fr 210px}
+.cb-inset,.cb-plan{border-right:2px solid #111;position:relative;min-width:0}
+#map2{height:122px;width:100%;background:#ddd}
+#planta svg{display:block;width:100%;height:122px;background:#fff}
+.cb-cap{font-size:10px;text-align:center;padding:2px 0;border-top:1px solid #111;background:#fafafa}
+.cb-tec{border-collapse:collapse;width:100%}
+.cb-tec td{border:1px solid #111;padding:2px 5px;font-size:11px}
+.cb-tec td.l{font:700 12px Arial;color:#B00020;width:48px;text-align:center}
+.cb-main{border-right:2px solid #111;min-width:0}
+.cb-main>div,.cb-side>div{padding:4px 8px;border-bottom:1px solid #111}
+.cb-main>div:last-child,.cb-side>div:last-child{border-bottom:0}
+.cb-main small,.cb-side small{display:block;color:#B00020;font-weight:700;font-size:11px}
+.cb-prop b{font-size:15px;letter-spacing:.02em;text-transform:uppercase;display:block;text-align:center}
+.cb-line{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cb-cont b{color:#B00020}
+.cb-cont .big{font-size:13px;font-weight:700}
+.cb-side b{font-size:14px}
+.cb-side .sig .line{border-top:1px solid #111;margin-top:26px}
+
+/* ---------- mapa ---------- */
+.maptools{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.sheet[data-fmt="topo"] .maptools,.sheet[data-fmt="topo"] .modehelp{margin:6px 10px}
+.maptools button{flex:1 1 auto;min-height:44px;font-size:.88rem}
+.maptools button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.modehelp{font:12px/1.4 system-ui,sans-serif;color:#444;margin:0 0 6px}
+#map{height:420px;width:100%;border:1px solid #555;background:#E8E4DA;z-index:0}
+.sheet[data-fmt="topo"] #map{height:540px;border:0;border-bottom:1px solid #111}
+.sheet[data-fmt="topo"] .northctl{display:none}
+.pin{background:#C00;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #222,0 2px 6px rgba(0,0,0,.5)}
+.refpin,.vpin{color:#fff;font:700 11px/20px system-ui,sans-serif;text-align:center;border-radius:4px;border:1.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.refpin{background:#0E2433}
+.vpin{background:#D9480F}
+.rtip{font:600 11px system-ui,sans-serif;background:#fff;border:1px solid #222;border-radius:3px;padding:1px 5px;color:#111;box-shadow:none}
+.rtip::before{display:none}
+.northctl{background:rgba(255,255,255,.85);padding:2px 4px;border-radius:4px;border:1px solid #555;line-height:0}
+.glab{font:700 10px/12px Arial,sans-serif;color:#000;text-align:center;white-space:nowrap;
+  text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 2px #fff}
+
+/* ---------- impressão ---------- */
+.printbar{display:none}
+body.printing .topbar,body.printing .panel,body.printing .maptools,body.printing .modehelp{display:none}
+body.printing .layout{display:block;padding:8px}
+body.printing .sheet{margin:0}
+body.printing .sheet[data-fmt="simples"]{width:703px;max-width:none}
+body.printing .printbar{display:flex;gap:8px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:2000;
+  background:var(--accent);color:#fff;padding:10px 14px;font-weight:700}
+body.printing .printbar button{background:#fff;color:var(--ink)}
+@page{size:A4;margin:10mm}
+@media print{
+  body{background:#fff}
+  .topbar,.panel,.maptools,.modehelp,.printbar,.leaflet-control-zoom,.leaflet-control-layers,.noprint{display:none!important}
+  .layout{display:block;padding:0;max-width:none}
+  .sheetwrap{overflow:visible}
+  .sheet{box-shadow:none;margin:0}
+  .sheet[data-fmt="simples"]{border:0;border-radius:0;padding:0;max-width:none;width:auto}
+  .sheet,.sheet *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .avoid,.sign,table,.carimbo{break-inside:avoid}
+  .sheet[data-fmt="topo"] #blkMem{break-before:page}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><b>Croqui de Localização</b><span>Croquis, coordenadas e memória descritiva</span></div>
+  <nav>
+    <a href="#dados">Dados</a>
+    <a href="#croqui">Croqui</a>
+    <button type="button" class="pri" id="btnPrint">Imprimir / PDF</button>
+  </nav>
+</header>
+
+<div class="printbar"><span>Modo de impressão</span><button type="button" id="btnBack">Voltar à edição</button></div>
+
+<div class="layout">
+
+<!-- ====================== FORMULÁRIO ====================== -->
+<aside class="panel" id="dados">
+  <p class="intro">1) Escolhe o modelo e preenche os dados. 2) Marca o local e os limites no mapa. 3) Confere a folha e toca em Imprimir / PDF.</p>
+
+  <details open>
+    <summary>1. Modelo, formato e sistema</summary>
+    <div class="g">
+      <label for="modelo">Tipo de croqui</label>
+      <select id="modelo" data-f></select>
+      <label for="formato">Formato da folha</label>
+      <select id="formato" data-f>
+        <option value="topo">Topográfico com carimbo (como os modelos)</option>
+        <option value="simples">Simples com memória descritiva</option>
+      </select>
+      <label for="finalidade">Fins / finalidade</label>
+      <input type="text" id="finalidade" data-f autocomplete="off">
+      <label for="datum">Sistema de coordenadas</label>
+      <select id="datum" data-f>
+        <option value="wgs84">Datum WGS 84 (Google Maps, GPS)</option>
+        <option value="camacupa">Datum Camacupa · Clarke 1880 (cartas de Angola)</option>
+      </select>
+      <div class="warn">Camacupa e WGS 84 diferem em cerca de 400 m em Luanda. Escolhe o mesmo sistema que a entidade exige. A conversão usa parâmetros padrão (EPSG); o técnico deve confirmá-los.</div>
+      <details>
+        <summary>Avançado: parâmetros Camacupa → WGS 84 (metros)</summary>
+        <div class="row3" style="grid-template-columns:1fr 1fr 1fr">
+          <input type="text" id="dx" data-f value="-50.9" inputmode="decimal" aria-label="dX">
+          <input type="text" id="dy" data-f value="-347.6" inputmode="decimal" aria-label="dY">
+          <input type="text" id="dz" data-f value="-231" inputmode="decimal" aria-label="dZ">
+        </div>
+        <p class="hint">Valores EPSG:4220 (dX, dY, dZ). Muda só se o técnico indicar outros.</p>
+      </details>
+      <label class="chk"><input type="checkbox" id="grid" checked><span>Mostrar quadrícula UTM no mapa</span></label>
+      <label for="cab">Cabeçalho (opcional)<span class="hint"> Uma linha por linha, se a entidade exigir.</span></label>
+      <textarea id="cab" data-f rows="2"></textarea>
+    </div>
+  </details>
+
+  <details open>
+    <summary>2. Identificação</summary>
+    <div class="g">
+      <label for="ent" id="lEnt">Proprietário</label>
+      <input type="text" id="ent" data-f autocomplete="off">
+      <label for="resp" id="lResp">Responsável</label>
+      <input type="text" id="resp" data-f autocomplete="off">
+      <div class="row2">
+        <div><label for="bi">BI / NIF</label><input type="text" id="bi" data-f autocomplete="off"></div>
+        <div><label for="tel">Contacto</label><input type="text" id="tel" data-f inputmode="tel" autocomplete="off"></div>
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>3. Endereço</summary>
+    <div class="g">
+      <label for="rua">Rua / Endereço / Referência</label>
+      <input type="text" id="rua" data-f autocomplete="off">
+      <div class="row2">
+        <div><label for="bairro">Bairro</label><input type="text" id="bairro" data-f autocomplete="off"></div>
+        <div><label for="distrito">Distrito / Comuna</label><input type="text" id="distrito" data-f autocomplete="off"></div>
+        <div><label for="mun">Município</label><input type="text" id="mun" data-f autocomplete="off"></div>
+        <div><label for="prov">Província</label><input type="text" id="prov" data-f autocomplete="off" value="Luanda"></div>
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>4. Coordenadas do local</summary>
+    <div class="g">
+      <label for="colar">Colar link do Google Maps, coordenadas ou Plus Code</label>
+      <input type="text" id="colar" autocomplete="off" placeholder='8°52&#39;30.1"S 13°20&#39;20.2"E  ou  -8.87503, 13.33894  ou  48FQ+XHW'>
+      <p class="hint">Cola o que o cliente enviou: o link da localização (WhatsApp ou Google Maps), graus/minutos/segundos, decimais ou Plus Code. São lidos como WGS 84 (o do Google).</p>
+      <div class="btnrow">
+        <button type="button" class="pri" id="btnColar">Aplicar</button>
+        <button type="button" id="btnGps">Usar o meu GPS</button>
+      </div>
+      <div class="btnrow"><button type="button" id="btnEnd">Preencher endereço pelo mapa</button></div>
+      <label id="lUtm">UTM no sistema escolhido</label>
+      <div class="row3">
+        <input type="text" id="utmE" inputmode="decimal" placeholder="Este (E)" autocomplete="off" aria-label="UTM Este">
+        <input type="text" id="utmN" inputmode="decimal" placeholder="Norte (N)" autocomplete="off" aria-label="UTM Norte">
+        <input type="text" id="utmZ" inputmode="numeric" value="33" aria-label="Zona UTM">
+      </div>
+      <div class="btnrow"><button type="button" id="btnUtm">Aplicar UTM (hemisfério sul)</button></div>
+      <div class="readout" id="readout"></div>
+      <p class="msg" id="msgLoc" aria-live="polite"></p>
+    </div>
+  </details>
+
+  <details>
+    <summary>5. Pontos de referência</summary>
+    <div class="g">
+      <p class="hint">No mapa, escolhe "+ Referência" e toca nos locais. Depois dá-lhes nome aqui.</p>
+      <div id="refList"></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>6. Limites, vértices e área</summary>
+    <div class="g">
+      <p class="hint">No mapa escolhe "Limites" e toca nos cantos do terreno, por ordem. A área e o perímetro são calculados.</p>
+      <div id="polyList"></div>
+      <div class="btnrow">
+        <button type="button" class="sm" id="btnUndo">Desfazer último</button>
+        <button type="button" class="sm" id="btnClearPoly">Limpar limites</button>
+      </div>
+      <div class="readout" id="areaOut"></div>
+      <label for="areaMan">Área manual (m²), se já souberes</label>
+      <input type="text" id="areaMan" data-f inputmode="decimal" autocomplete="off">
+      <p class="hint">Se preencheres, esta área tem prioridade sobre a calculada.</p>
+      <label>Confrontações (quem fica ao lado)</label>
+      <div class="row2">
+        <input type="text" id="limN" data-f placeholder="Norte" aria-label="Limite Norte" autocomplete="off">
+        <input type="text" id="limS" data-f placeholder="Sul" aria-label="Limite Sul" autocomplete="off">
+        <input type="text" id="limE" data-f placeholder="Este" aria-label="Limite Este" autocomplete="off">
+        <input type="text" id="limO" data-f placeholder="Oeste" aria-label="Limite Oeste" autocomplete="off">
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>7. Técnico e carimbo</summary>
+    <div class="g">
+      <label for="tecModo">Como identificar o técnico</label>
+      <select id="tecModo" data-f>
+        <option value="ambos">Nome e n.º de registo</option>
+        <option value="nome">Só o nome</option>
+        <option value="reg">Só o n.º de registo</option>
+        <option value="nenhum">Nenhum (espaço em branco para assinar)</option>
+      </select>
+      <label for="elab">Nome do técnico</label>
+      <input type="text" id="elab" data-f autocomplete="off">
+      <label for="qual">N.º de registo / cédula profissional</label>
+      <input type="text" id="qual" data-f autocomplete="off">
+      <div class="row2">
+        <div><label for="folha">Folha N.º</label><input type="text" id="folha" data-f placeholder="Ex.: 89-C-IV" autocomplete="off"></div>
+        <div><label for="escala">Escala</label><input type="text" id="escala" data-f placeholder="Vazio = automática" autocomplete="off"></div>
+        <div><label for="registo">Registo / Processo N.º</label><input type="text" id="registo" data-f autocomplete="off"></div>
+        <div><label for="desenho">Desenho N.º</label><input type="text" id="desenho" data-f value="1" autocomplete="off"></div>
+      </div>
+      <label for="espec">Especialidade</label>
+      <input type="text" id="espec" data-f value="TOPOGRAFIA" autocomplete="off">
+      <label>Quadro Campo / Proj. / Des. / Verif.</label>
+      <div class="rowd"><span>Campo</span><div class="row2"><input type="text" id="cp1d" data-f placeholder="Data" aria-label="Campo data"><input type="text" id="cp1n" data-f placeholder="Nome" aria-label="Campo nome"></div></div>
+      <div class="rowd"><span>Proj.</span><div class="row2"><input type="text" id="cp2d" data-f placeholder="Data" aria-label="Proj data"><input type="text" id="cp2n" data-f placeholder="Nome" aria-label="Proj nome"></div></div>
+      <div class="rowd"><span>Des.</span><div class="row2"><input type="text" id="cp3d" data-f placeholder="Data" aria-label="Des data"><input type="text" id="cp3n" data-f placeholder="Nome" aria-label="Des nome"></div></div>
+      <div class="rowd"><span>Verif.</span><div class="row2"><input type="text" id="cp4d" data-f placeholder="Data" aria-label="Verif data"><input type="text" id="cp4n" data-f placeholder="Nome" aria-label="Verif nome"></div></div>
+      <div class="btnrow"><button type="button" class="sm" id="btnCopiaTec">Preencher o quadro com o técnico e a data de hoje</button></div>
+      <div class="row2">
+        <div><label for="local">Local</label><input type="text" id="local" data-f value="Luanda" autocomplete="off"></div>
+        <div><label for="data">Data</label><input type="text" id="data" data-f autocomplete="off"></div>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>8. Memória descritiva</summary>
+    <div class="g">
+      <label class="chk"><input type="checkbox" id="memShow" checked><span>Incluir a memória descritiva na folha</span></label>
+      <textarea id="mem" rows="12"></textarea>
+      <p class="hint" id="memHint">O texto é preenchido sozinho a partir dos dados. Se o editares, deixa de se atualizar.</p>
+      <div class="btnrow"><button type="button" class="sm" id="btnMemAuto">Voltar ao texto automático</button></div>
+      <label class="chk"><input type="checkbox" id="nota" checked><span>Incluir nota de verificação (coordenadas por meios digitais, a confirmar no local por técnico habilitado)</span></label>
+      <label class="chk"><input type="checkbox" id="tabela" checked><span>Mostrar quadro de coordenadas na folha</span></label>
+    </div>
+  </details>
+
+  <details>
+    <summary>9. Guardar e abrir croquis</summary>
+    <div class="g">
+      <label for="projNome">Nome para guardar</label>
+      <input type="text" id="projNome" autocomplete="off" placeholder="Ex.: Igreja Filadélfia">
+      <div class="btnrow"><button type="button" class="pri" id="btnSave">Guardar croqui</button><button type="button" id="btnNew">Novo croqui</button></div>
+      <div id="saved"></div>
+      <p class="hint">Fica guardado neste telemóvel/navegador. O que estás a escrever é guardado automaticamente.</p>
+    </div>
+  </details>
+</aside>
+
+<!-- ====================== FOLHA ====================== -->
+<section class="sheetwrap" id="croqui">
+  <article class="sheet" id="sheet" data-fmt="topo">
+    <div class="s-cab" id="sCab"></div>
+    <div class="t-head">
+      <svg viewBox="0 0 90 90" width="64" height="64" role="img" aria-label="Rosa dos ventos">
+        <circle cx="45" cy="45" r="22" fill="#222" stroke="#fff" stroke-width="2"/>
+        <polygon points="45,12 52,45 45,78 38,45" fill="#fff" stroke="#222" stroke-width="1"/>
+        <polygon points="12,45 45,38 78,45 45,52" fill="#fff" stroke="#222" stroke-width="1"/>
+        <circle cx="45" cy="45" r="5" fill="#222"/>
+        <text x="45" y="9" text-anchor="middle" font-size="12" font-weight="700" fill="#111" font-family="Arial">N</text>
+        <text x="45" y="89" text-anchor="middle" font-size="12" font-weight="700" fill="#111" font-family="Arial">S</text>
+        <text x="6" y="49" text-anchor="middle" font-size="12" font-weight="700" fill="#111" font-family="Arial">W</text>
+        <text x="84" y="49" text-anchor="middle" font-size="12" font-weight="700" fill="#111" font-family="Arial">E</text>
+      </svg>
+      <h2 class="s-title" id="sTitulo"></h2>
+    </div>
+    <p class="s-sub" id="sSub"></p>
+
+    <div id="blkId"><h3 class="s-h" id="hId"></h3><div id="sId"></div></div>
+
+    <h3 class="s-h" id="hMapa"></h3>
+    <div class="maptools" id="modes">
+      <button type="button" data-mode="main" class="on">Marcar local</button>
+      <button type="button" data-mode="ref">+ Referência</button>
+      <button type="button" data-mode="poly">Limites</button>
+      <button type="button" id="btnFit">Enquadrar tudo</button>
+    </div>
+    <p class="modehelp" id="modeHelp"></p>
+    <div id="map"></div>
+    <div class="legend" id="sLegend"></div>
+
+    <div id="sCoordsWrap"><h3 class="s-h" id="hCoords"></h3><p class="datumtxt" id="datumTxt"></p><div id="sCoords"></div></div>
+
+    <div class="carimbo" id="blkCarimbo">
+      <div class="cb-row1">
+        <div class="cb-inset"><div id="map2"></div><div class="cb-cap">Terreno localizado (imagem Esri)</div></div>
+        <div class="cb-plan"><div id="planta"></div><div class="cb-cap">Planta do terreno (medidas em m)</div></div>
+        <table class="cb-tec" id="cbTec"></table>
+      </div>
+      <div class="cb-row2">
+        <div class="cb-main">
+          <div class="cb-prop"><small>Proprietário:</small><b id="cbProp"></b></div>
+          <div class="cb-line"><span id="cbEsc"></span><span id="cbFolha"></span><span id="cbAreaPer"></span></div>
+          <div id="cbLoc"></div>
+          <div class="cb-cont"><b>Contém:</b> <span class="big" id="cbCont"></span><br><span id="cbFins"></span></div>
+        </div>
+        <div class="cb-side">
+          <div><small>Registo</small><span id="cbReg">&nbsp;</span></div>
+          <div><small>Especialidade</small><b id="cbEsp"></b></div>
+          <div><small>Desenho N.º</small><b id="cbDes"></b></div>
+          <div class="sig"><small>Técnico</small><span id="cbTecnico"></span><div class="line"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="blkMem"><h3 class="s-h" id="hMem"></h3><div class="mem" id="sMem"></div></div>
+
+    <div id="blkSign">
+      <div class="s-date" id="sDate"></div>
+      <div class="sign avoid">
+        <div><div class="line"><b id="sElab">&nbsp;</b><small id="sQual"></small><small>O Técnico / Elaborador</small></div></div>
+        <div><div class="line"><b id="sResp">&nbsp;</b><small id="sRespL"></small></div></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+
+/*GEO-START*/
+var ALPH = '23456789CFGHJMPQRVWX';
+var ELL = {wgs84:{a:6378137, f:1/298.257223563}, clrk80:{a:6378249.145, f:1/293.465}};
+var DATUMS = {
+  wgs84:{nome:'WGS 84', ell:'wgs84', shift:[0,0,0], txt:'Datum WGS 84 · Elipsóide WGS 84'},
+  camacupa:{nome:'Camacupa', ell:'clrk80', shift:[-50.9,-347.6,-231.0], txt:'Datum Camacupa · Elipsóide Clarke 1880'}
+};
+function ellp(E){ var e2=E.f*(2-E.f); return {a:E.a, e2:e2, ep2:e2/(1-e2)}; }
+function utmZone(lon){ return Math.floor((lon+180)/6)+1; }
+function toUTMe(lat, lon, zone, ell){
+  var P=ellp(ell), a=P.a, e2=P.e2, ep2=P.ep2, k0=0.9996, rad=Math.PI/180;
+  var lon0=((zone-1)*6-180+3)*rad, phi=lat*rad, lam=lon*rad;
+  var s=Math.sin(phi), c=Math.cos(phi), t=Math.tan(phi);
+  var N=a/Math.sqrt(1-e2*s*s), T=t*t, C=ep2*c*c, A=c*(lam-lon0);
+  var e4=e2*e2, e6=e4*e2;
+  var M=a*((1-e2/4-3*e4/64-5*e6/256)*phi-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*phi)
+        +(15*e4/256+45*e6/1024)*Math.sin(4*phi)-(35*e6/3072)*Math.sin(6*phi));
+  var x=k0*N*(A+(1-T+C)*Math.pow(A,3)/6+(5-18*T+T*T+72*C-58*ep2)*Math.pow(A,5)/120)+500000;
+  var y=k0*(M+N*t*(A*A/2+(5-T+9*C+4*C*C)*Math.pow(A,4)/24+(61-58*T+T*T+600*C-330*ep2)*Math.pow(A,6)/720));
+  if(lat<0) y+=10000000;
+  return {e:x, n:y, zone:zone};
+}
+function fromUTMe(e, n, zone, south, ell){
+  var P=ellp(ell), a=P.a, e2=P.e2, ep2=P.ep2, k0=0.9996, rad=Math.PI/180;
+  var x=e-500000, y=south? n-10000000 : n, lon0=((zone-1)*6-180+3)*rad;
+  var e4=e2*e2, e6=e4*e2;
+  var M=y/k0, mu=M/(a*(1-e2/4-3*e4/64-5*e6/256));
+  var e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  var phi1=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)
+           +(151*Math.pow(e1,3)/96)*Math.sin(6*mu)+(1097*Math.pow(e1,4)/512)*Math.sin(8*mu);
+  var s=Math.sin(phi1), c=Math.cos(phi1), t=Math.tan(phi1);
+  var N1=a/Math.sqrt(1-e2*s*s), T1=t*t, C1=ep2*c*c, R1=a*(1-e2)/Math.pow(1-e2*s*s,1.5), D=x/(N1*k0);
+  var lat=phi1-(N1*t/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*Math.pow(D,4)/24
+          +(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*Math.pow(D,6)/720);
+  var lon=lon0+(D-(1+2*T1+C1)*Math.pow(D,3)/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*Math.pow(D,5)/120)/c;
+  return {lat:lat/rad, lon:lon/rad};
+}
+function geod2ecef(lat, lon, P){
+  var r=Math.PI/180, p=lat*r, l=lon*r, s=Math.sin(p), N=P.a/Math.sqrt(1-P.e2*s*s);
+  return [N*Math.cos(p)*Math.cos(l), N*Math.cos(p)*Math.sin(l), N*(1-P.e2)*s];
+}
+function ecef2geod(X, Y, Z, P){
+  var p=Math.sqrt(X*X+Y*Y), lat=Math.atan2(Z,p*(1-P.e2)), i, N, h, s;
+  for(i=0;i<8;i++){ s=Math.sin(lat); N=P.a/Math.sqrt(1-P.e2*s*s); h=p/Math.cos(lat)-N; lat=Math.atan2(Z,p*(1-P.e2*N/(N+h))); }
+  return {lat:lat*180/Math.PI, lon:Math.atan2(Y,X)*180/Math.PI};
+}
+function wgsToDatum(lat, lon, dk){
+  if(dk==='wgs84') return {lat:lat, lon:lon};
+  var D=DATUMS[dk], c=geod2ecef(lat,lon,ellp(ELL.wgs84));
+  return ecef2geod(c[0]-D.shift[0], c[1]-D.shift[1], c[2]-D.shift[2], ellp(ELL[D.ell]));
+}
+function datumToWgs(lat, lon, dk){
+  if(dk==='wgs84') return {lat:lat, lon:lon};
+  var D=DATUMS[dk], c=geod2ecef(lat,lon,ellp(ELL[D.ell]));
+  return ecef2geod(c[0]+D.shift[0], c[1]+D.shift[1], c[2]+D.shift[2], ellp(ELL.wgs84));
+}
+function utmFromWgs(lat, lon, zone, dk){
+  var g=wgsToDatum(lat,lon,dk), u=toUTMe(g.lat,g.lon,zone,ELL[DATUMS[dk].ell]);
+  u.glat=g.lat; u.glon=g.lon; return u;
+}
+function wgsFromUtm(e, n, zone, dk){
+  var g=fromUTMe(e,n,zone,true,ELL[DATUMS[dk].ell]);
+  return datumToWgs(g.lat,g.lon,dk);
+}
+function toDMS(val, isLat){
+  var h = isLat ? (val<0?'S':'N') : (val<0?'W':'E');
+  var a=Math.abs(val), d=Math.floor(a), m=Math.floor((a-d)*60);
+  var s=Math.round(((a-d)*60-m)*60*100)/100;
+  if(s>=60){ s=0; m++; } if(m>=60){ m=0; d++; }
+  return d+'\u00B0 '+m+"' "+s.toFixed(2)+'" '+h;
+}
+function olcDecode(code){
+  var c=code.toUpperCase().replace('+',''), res=[20,1,0.05,0.0025,0.000125];
+  var lat=-90, lon=-180, n=Math.min(c.length,10), i;
+  for(i=0;i<n;i+=2){ lat+=ALPH.indexOf(c.charAt(i))*res[i/2]; lon+=ALPH.indexOf(c.charAt(i+1))*res[i/2]; }
+  var size=res[Math.floor((n-1)/2)], lonSize=size;
+  if(c.length>10){
+    var idx=ALPH.indexOf(c.charAt(10));
+    lat+=Math.floor(idx/4)*0.000025; lon+=(idx%4)*0.00003125; size=0.000025; lonSize=0.00003125;
+  }
+  return {lat:lat+size/2, lon:lon+lonSize/2};
+}
+function olcPrefix(lat, lon){
+  var la=lat+90, lo=lon+180, a=Math.floor(la/20), b=Math.floor(lo/20);
+  la-=a*20; lo-=b*20;
+  return ALPH.charAt(a)+ALPH.charAt(b)+ALPH.charAt(Math.floor(la))+ALPH.charAt(Math.floor(lo));
+}
+function decodeShort(code, ref){
+  var p=olcDecode(olcPrefix(ref.lat, ref.lon)+code);
+  if(p.lat-ref.lat>0.5) p.lat-=1; else if(p.lat-ref.lat<-0.5) p.lat+=1;
+  if(p.lon-ref.lon>0.5) p.lon-=1; else if(p.lon-ref.lon<-0.5) p.lon+=1;
+  return p;
+}
+function parsePlus(s, ref){
+  var m=/(^|[^A-Z0-9])([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})/i.exec(s);
+  if(!m) return null;
+  var code=m[2].toUpperCase(), pre=code.indexOf('+');
+  if(pre===4) return decodeShort(code, ref);
+  if(pre===8) return olcDecode(code);
+  return null;
+}
+function num(x){ return parseFloat(String(x).replace(',','.')); }
+function parseCoords(text, ref){
+  var s=String(text||'').replace(/[\u2212\u2013]/g,'-').trim();
+  if(!s) return null;
+  if(s.indexOf('+')!==-1){ var pc=parsePlus(s, ref); if(pc) return pc; }
+  var re=/(\d+(?:[.,]\d+)?)\s*[\u00B0\u00BA]\s*(?:(\d+(?:[.,]\d+)?)\s*['\u2032\u2019]\s*)?(?:(\d+(?:[.,]\d+)?)\s*(?:["\u2033\u201D]|'')\s*)?\s*([NSEWOnsewo])/g;
+  var found=[], m;
+  while((m=re.exec(s))!==null){
+    var v=num(m[1])+(m[2]?num(m[2])/60:0)+(m[3]?num(m[3])/3600:0), h=m[4].toUpperCase();
+    if(h==='S'||h==='W'||h==='O') v=-v;
+    found.push({v:v, lat:(h==='N'||h==='S')});
+  }
+  if(found.length>=2){
+    var la=null, lo=null;
+    found.forEach(function(f){ if(f.lat&&la===null) la=f.v; else if(!f.lat&&lo===null) lo=f.v; });
+    if(la!==null && lo!==null) return {lat:la, lon:lo};
+  }
+  var d=/(-?\d+(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d+(?:[.,]\d+)?)/.exec(s);
+  if(d){
+    var a1=num(d[1]), a2=num(d[2]);
+    if(Math.abs(a1)<=90 && Math.abs(a2)<=180) return {lat:a1, lon:a2};
+  }
+  return null;
+}
+function parseMapsUrl(text, ref){
+  var s=String(text||'');
+  if(!/https?:\/\/|maps\.|goo\.gl/i.test(s)) return null;
+  var d=s; try{ d=decodeURIComponent(s); }catch(e){}
+  var m=/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(d);
+  if(m) return {lat:parseFloat(m[1]), lon:parseFloat(m[2])};
+  m=/[?&](?:q|query|ll|sll|destination|daddr|center)=\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/.exec(d);
+  if(m) return {lat:parseFloat(m[1]), lon:parseFloat(m[2])};
+  var seg=/\/place\/([^\/@?]+)/.exec(d);
+  if(seg){
+    var r=parseCoords(seg[1], ref) || parseCoords(seg[1].replace(/\+/g,' '), ref);
+    if(r) return r;
+  }
+  m=/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(d);
+  if(m) return {lat:parseFloat(m[1]), lon:parseFloat(m[2])};
+  return null;
+}
+function inAngola(p){ return p.lat>=-18.2 && p.lat<=-4.3 && p.lon>=11.5 && p.lon<=24.2; }
+function haversine(a, b){
+  var R=6371008.8, rad=Math.PI/180, dLat=(b.lat-a.lat)*rad, dLon=(b.lon-a.lon)*rad;
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+function polyXY(pts){
+  var lon=0; pts.forEach(function(p){ lon+=p.lon; }); lon/=pts.length;
+  var z=utmZone(lon);
+  return pts.map(function(p){ var u=toUTMe(p.lat,p.lon,z,ELL.wgs84); return {x:u.e, y:u.n}; });
+}
+function polyMetrics(pts){
+  if(pts.length<3) return null;
+  var xy=polyXY(pts), A=0, P=0, i, j;
+  for(i=0;i<xy.length;i++){
+    j=(i+1)%xy.length;
+    A+=xy[i].x*xy[j].y-xy[j].x*xy[i].y;
+    P+=Math.sqrt(Math.pow(xy[j].x-xy[i].x,2)+Math.pow(xy[j].y-xy[i].y,2));
+  }
+  return {area:Math.abs(A)/2, perim:P};
+}
+/*GEO-END*/
+
+/* ---------- modelos ---------- */
+var FIN = 'Serviços administrativos legais';
+var MODELOS = {
+  igreja:{nome:'Igreja / Associação religiosa', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Proprietário / Igreja', resp:'Líder / Responsável', ao:'à igreja', g:'a', fin:FIN},
+  terreno:{nome:'Terreno / Parcela', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Proprietário', resp:'Representante', ao:'ao terreno', g:'o', fin:FIN},
+  casa:{nome:'Habitação / Residência', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Proprietário / Morador', resp:'Representante', ao:'à habitação', g:'a', fin:FIN},
+  comercio:{nome:'Comércio / Empresa', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Empresa / Estabelecimento', resp:'Gerente / Representante', ao:'ao estabelecimento', g:'o', fin:FIN},
+  escola:{nome:'Escola / Instituição', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Escola / Instituição', resp:'Diretor / Responsável', ao:'à instituição', g:'a', fin:FIN},
+  outro:{nome:'Outro (modelo livre)', titulo:'CROQUIS DE LOCALIZAÇÃO', ent:'Proprietário / Requerente', resp:'Responsável', ao:'ao local', g:'o', fin:''}
+};
+var MODE_HELP = {
+  main:'Toca no mapa para marcar o local principal (ponto vermelho). Podes arrastar o ponto.',
+  ref:'Toca no mapa para adicionar pontos de referência (R1, R2…). Dá-lhes nome na lista de dados.',
+  poly:'Toca nos cantos do terreno, por ordem (V1, V2…). A área e o perímetro são calculados.'
+};
+
+/* ---------- estado ---------- */
+var S = {main:null, refs:[], poly:[]};
+var mode = 'main', autoMem = true, baseName = 'osm', activeBase = null;
+var map, map2, baseOSM, baseSat, baseSat2, grp, grp2, gridGrp, saveTimer = null, lastModel = 'igreja';
+var DEFAULT_VIEW = {lat:-8.84, lon:13.29, zoom:12};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function fmt(n, d){ d = d==null ? 1 : d; return n.toLocaleString('pt-PT',{minimumFractionDigits:d, maximumFractionDigits:d}); }
+function v(id){ var el=$(id); return el ? el.value.trim() : ''; }
+function dk(){ return v('datum')==='camacupa' ? 'camacupa' : 'wgs84'; }
+function refPoint(){ var c=map.getCenter(); return S.main ? S.main : {lat:c.lat, lon:c.lng}; }
+function zoneNow(){ var p = S.main || S.poly[0] || S.refs[0]; return utmZone(p ? p.lon : map.getCenter().lng); }
+function readShift(){
+  var a=num(v('dx')), b=num(v('dy')), c=num(v('dz'));
+  if(isFinite(a)&&isFinite(b)&&isFinite(c)) DATUMS.camacupa.shift=[a,b,c];
+}
+function todayDots(){ var d=new Date(), p=function(n){ return ('0'+n).slice(-2); }; return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear(); }
+function tec(){
+  var mo=v('tecModo')||'ambos', n=v('elab'), r=v('qual');
+  return {nome:(mo==='ambos'||mo==='nome')?n:'', reg:(mo==='ambos'||mo==='reg')?r:''};
+}
+
+/* ---------- mapas ---------- */
+function initMap(){
+  map = L.map('map', {zoomSnap:1, maxZoom:20, tap:true}).setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lon], DEFAULT_VIEW.zoom);
+  baseOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxNativeZoom:19, maxZoom:20, attribution:'&copy; OpenStreetMap'});
+  baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxNativeZoom:19, maxZoom:20, attribution:'Imagem &copy; Esri, Maxar, Earthstar'});
+  baseOSM.addTo(map); activeBase = baseOSM;
+  L.control.layers({'Mapa':baseOSM, 'Satélite':baseSat}, null, {position:'topright', collapsed:true}).addTo(map);
+  L.control.scale({imperial:false, position:'bottomleft'}).addTo(map);
+  var North = L.Control.extend({options:{position:'topright'}, onAdd:function(){
+    var d = L.DomUtil.create('div','northctl');
+    d.innerHTML = '<svg viewBox="0 0 40 62" width="30" height="46" role="img" aria-label="Norte"><text x="20" y="14" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="16" fill="#111">N</text><polygon points="20,18 34,58 20,48 6,58" fill="#111"/><polygon points="20,18 20,48 6,58" fill="#fff" stroke="#111" stroke-width="1.5"/></svg>';
+    return d;
+  }});
+  new North().addTo(map);
+  grp = L.layerGroup().addTo(map);
+  gridGrp = L.layerGroup().addTo(map);
+  map.on('baselayerchange', function(e){ activeBase = e.layer; baseName = (e.layer===baseSat) ? 'sat' : 'osm'; renderSheet(); scheduleSave(); });
+  map.on('zoomend', function(){ renderSheet(); });
+  map.on('moveend', function(){ drawGrid(); scheduleSave(); });
+  map.on('click', function(e){
+    if(mode==='main') setMain(e.latlng.lat, e.latlng.lng, {});
+    else if(mode==='ref'){ S.refs.push({lat:e.latlng.lat, lon:e.latlng.lng, nome:''}); renderLists(); renderOutputs(); }
+    else if(mode==='poly'){ S.poly.push({lat:e.latlng.lat, lon:e.latlng.lng}); renderLists(); renderOutputs(); }
+  });
+
+  map2 = L.map('map2', {zoomControl:false, attributionControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false,
+    boxZoom:false, keyboard:false, touchZoom:false, tap:false, zoomSnap:1, maxZoom:20}).setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lon], 17);
+  baseSat2 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxNativeZoom:19, maxZoom:20}).addTo(map2);
+  grp2 = L.layerGroup().addTo(map2);
+}
+function mk(p, cls, txt, size, onMove, z){
+  var m = L.marker([p.lat,p.lon], {draggable:true, keyboard:false, zIndexOffset:z||0,
+    icon:L.divIcon({className:cls, html:txt, iconSize:size, iconAnchor:[size[0]/2,size[1]/2]})});
+  m.on('dragend', function(){ var ll=m.getLatLng(); onMove(ll); setTimeout(function(){ renderLists(); renderOutputs(); },0); });
+  return m;
+}
+function redrawLayers(){
+  grp.clearLayers(); grp2.clearLayers();
+  if(S.poly.length>=2){
+    var ll = S.poly.map(function(p){ return [p.lat,p.lon]; });
+    (S.poly.length>=3 ? L.polygon(ll,{color:'#D9480F',weight:3,fillColor:'#D9480F',fillOpacity:.15,interactive:false})
+                      : L.polyline(ll,{color:'#D9480F',weight:3,interactive:false})).addTo(grp);
+    if(S.poly.length>=3) L.polygon(ll,{color:'#7CFC00',weight:2,fillColor:'#7CFC00',fillOpacity:.3,interactive:false}).addTo(grp2);
+  }
+  S.poly.forEach(function(p,i){
+    mk(p,'vpin','V'+(i+1),[28,20],function(l){ S.poly[i].lat=l.lat; S.poly[i].lon=l.lng; },200).addTo(grp);
+  });
+  S.refs.forEach(function(r,i){
+    var m = mk(r,'refpin','R'+(i+1),[30,20],function(l){ S.refs[i].lat=l.lat; S.refs[i].lon=l.lng; },400);
+    if(r.nome) m.bindTooltip(r.nome,{permanent:true, direction:'right', offset:[16,0], className:'rtip'});
+    m.addTo(grp);
+  });
+  if(S.main){
+    mk(S.main,'pin','',[26,26],function(l){ S.main.lat=l.lat; S.main.lon=l.lng; S.main.acc=null; },1000).addTo(grp);
+    L.circleMarker([S.main.lat,S.main.lon],{radius:5,color:'#fff',weight:2,fillColor:'#C00',fillOpacity:1,interactive:false}).addTo(grp2);
+  }
+  updateInset();
+}
+function updateInset(){
+  if(!map2) return;
+  map2.invalidateSize();
+  var pts = S.poly.map(function(p){ return [p.lat,p.lon]; });
+  if(pts.length>=2) map2.fitBounds(L.latLngBounds(pts), {padding:[18,18], maxZoom:19, animate:false});
+  else if(S.main) map2.setView([S.main.lat,S.main.lon], 18, {animate:false});
+}
+function drawGrid(){
+  gridGrp.clearLayers();
+  if(!$('grid').checked) return;
+  var b=map.getBounds(), d=dk(), z=utmZone(map.getCenter().lng);
+  var cs=[[b.getSouth(),b.getWest()],[b.getSouth(),b.getEast()],[b.getNorth(),b.getWest()],[b.getNorth(),b.getEast()]]
+    .map(function(q){ return utmFromWgs(q[0],q[1],z,d); });
+  var es=cs.map(function(c){return c.e;}), ns=cs.map(function(c){return c.n;});
+  var emin=Math.min.apply(null,es), emax=Math.max.apply(null,es), nmin=Math.min.apply(null,ns), nmax=Math.max.apply(null,ns);
+  var span=Math.max(emax-emin, nmax-nmin), steps=[10,20,50,100,200,500,1000,2000,5000,10000,20000], step=steps[steps.length-1], i;
+  for(i=0;i<steps.length;i++){ if(span/steps[i]<=6){ step=steps[i]; break; } }
+  var line={color:'#000',weight:1,opacity:.6,interactive:false}, e, n, t, w;
+  function lab(lat,lon,txt){
+    L.marker([lat,lon],{interactive:false,keyboard:false,icon:L.divIcon({className:'glab',html:txt,iconSize:[60,12],iconAnchor:[30,6]})}).addTo(gridGrp);
+  }
+  for(e=Math.ceil(emin/step)*step; e<=emax; e+=step){
+    var pe=[0,.5,1].map(function(t){ var q=wgsFromUtm(e,nmin+(nmax-nmin)*t,z,d); return [q.lat,q.lon]; });
+    L.polyline(pe,line).addTo(gridGrp);
+    w=wgsFromUtm(e,nmin+(nmax-nmin)*0.04,z,d); lab(w.lat,w.lon,String(e));
+  }
+  for(n=Math.ceil(nmin/step)*step; n<=nmax; n+=step){
+    var pn=[0,.5,1].map(function(t){ var q=wgsFromUtm(emin+(emax-emin)*t,n,z,d); return [q.lat,q.lon]; });
+    L.polyline(pn,line).addTo(gridGrp);
+    w=wgsFromUtm(emin+(emax-emin)*0.07,n,z,d); lab(w.lat,w.lon,String(n));
+  }
+}
+function setMain(lat, lon, o){
+  S.main = {lat:lat, lon:lon, acc:o.acc||null};
+  if(o.center) map.setView([lat,lon], Math.max(map.getZoom(), o.zoom||17));
+  renderLists(); renderOutputs();
+}
+function fitAll(){
+  var pts = [];
+  if(S.main) pts.push([S.main.lat,S.main.lon]);
+  S.refs.forEach(function(r){ pts.push([r.lat,r.lon]); });
+  S.poly.forEach(function(p){ pts.push([p.lat,p.lon]); });
+  if(!pts.length) return;
+  if(pts.length===1) map.setView(pts[0], 18); else map.fitBounds(L.latLngBounds(pts), {padding:[30,30], maxZoom:19});
+}
+function setMode(m){
+  mode = m;
+  Array.prototype.forEach.call(document.querySelectorAll('#modes [data-mode]'), function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });
+  $('modeHelp').textContent = MODE_HELP[m];
+}
+function escalaAuto(){
+  var lat = S.main ? S.main.lat : map.getCenter().lat;
+  var mpp = 156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2,map.getZoom());
+  var d = mpp/0.00026458;
+  d = d<1000 ? Math.round(d/10)*10 : Math.round(d/50)*50;
+  return '1:'+d.toLocaleString('pt-PT');
+}
+function areaInfo(){
+  var man = num(v('areaMan')), pm = polyMetrics(S.poly);
+  if(isFinite(man) && man>0) return {area:man, perim: pm?pm.perim:null, src:'manual'};
+  if(pm) return {area:pm.area, perim:pm.perim, src:'calculada'};
+  return null;
+}
+function plantaSvg(){
+  var W=176, H=122, pad=24, head='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">';
+  if(S.poly.length<3) return head+'<text x="'+W/2+'" y="'+H/2+'" text-anchor="middle" font-size="9" font-family="Arial" fill="#777">Marca os limites no mapa</text></svg>';
+  var xy = polyXY(S.poly), minx=Infinity, maxx=-Infinity, miny=Infinity, maxy=-Infinity;
+  xy.forEach(function(p){ minx=Math.min(minx,p.x); maxx=Math.max(maxx,p.x); miny=Math.min(miny,p.y); maxy=Math.max(maxy,p.y); });
+  var sc = Math.min((W-2*pad)/((maxx-minx)||1), (H-2*pad)/((maxy-miny)||1));
+  var ox = (W-(maxx-minx)*sc)/2, oy = (H-(maxy-miny)*sc)/2;
+  function X(x){ return ox+(x-minx)*sc; } function Y(y){ return H-(oy+(y-miny)*sc); }
+  var pts = xy.map(function(p){ return X(p.x).toFixed(1)+','+Y(p.y).toFixed(1); }).join(' ');
+  var s = head+'<polygon points="'+pts+'" fill="#78D63C" stroke="#111" stroke-width="1.3"/>';
+  xy.forEach(function(p,i){
+    var q = xy[(i+1)%xy.length], len = Math.sqrt(Math.pow(q.x-p.x,2)+Math.pow(q.y-p.y,2));
+    var mx=(X(p.x)+X(q.x))/2, my=(Y(p.y)+Y(q.y))/2;
+    s += '<text x="'+mx.toFixed(1)+'" y="'+my.toFixed(1)+'" text-anchor="middle" font-size="8" font-family="Arial" font-weight="700" fill="#111" stroke="#fff" stroke-width="2.4" paint-order="stroke">'+len.toFixed(2)+'</text>';
+    s += '<text x="'+(X(p.x)+3).toFixed(1)+'" y="'+(Y(p.y)-3).toFixed(1)+'" font-size="7" font-family="Arial" fill="#B00020">V'+(i+1)+'</text>';
+  });
+  return s+'</svg>';
+}
+
+/* ---------- memória descritiva ---------- */
+function buildMem(){
+  var m = MODELOS[v('modelo')] || MODELOS.outro, P = [], ent = v('ent'), loc = [], d = dk();
+  if(v('rua')) loc.push('em '+v('rua'));
+  if(v('bairro')) loc.push('no bairro '+v('bairro'));
+  if(v('distrito')) loc.push('no distrito/comuna de '+v('distrito'));
+  if(v('mun')) loc.push('no município de '+v('mun'));
+  if(v('prov')) loc.push('na província de '+v('prov'));
+  loc.push('República de Angola');
+  P.push('O presente croqui de localização refere-se '+m.ao+(ent?' «'+ent+'»':'')+', situad'+m.g+' '+loc.join(', ')+'.');
+  if(v('finalidade')) P.push('Fins: '+v('finalidade')+'.');
+  if(S.main){
+    var z=zoneNow(), u=utmFromWgs(S.main.lat,S.main.lon,z,d);
+    P.push('O ponto central localiza-se nas coordenadas geográficas '+toDMS(u.glat,true)+' e '+toDMS(u.glon,false)+' ('+DATUMS[d].txt.split(' · ')[0]+'), correspondentes a E '+u.e.toFixed(2)+' m e N '+u.n.toFixed(2)+' m na projeção UTM, zona '+z+'S.');
+  }
+  var lim = [];
+  if(v('limN')) lim.push('a Norte com '+v('limN'));
+  if(v('limS')) lim.push('a Sul com '+v('limS'));
+  if(v('limE')) lim.push('a Este com '+v('limE'));
+  if(v('limO')) lim.push('a Oeste com '+v('limO'));
+  if(lim.length) P.push('Confronta '+lim.join(', ')+'.');
+  var ai = areaInfo();
+  if(ai){
+    var t = 'Área '+(ai.src==='manual'?'indicada':'aproximada')+': '+fmt(ai.area,1)+' m²';
+    if(ai.perim) t += ' e perímetro aproximado de '+fmt(ai.perim,1)+' m';
+    if(S.poly.length>=3) t += ', delimitada pelos '+S.poly.length+' vértices indicados no quadro de coordenadas';
+    P.push(t+'.');
+  }
+  if(S.refs.length){
+    P.push('Pontos de referência: '+S.refs.map(function(r,i){
+      var s='R'+(i+1)+' – '+(r.nome||'ponto sem nome');
+      if(S.main) s += ' (a cerca de '+fmt(haversine(S.main,r),0)+' m)';
+      return s;
+    }).join('; ')+'.');
+  }
+  if(v('resp')) P.push(m.resp+': '+v('resp')+(v('bi')?' (BI/NIF '+v('bi')+')':'')+(v('tel')?', contacto '+v('tel'):'')+'.');
+  if($('nota').checked) P.push('Nota: as coordenadas foram obtidas por meios digitais de georreferenciação e podem ter uma margem de erro de alguns metros, devendo ser confirmadas no local por técnico habilitado.');
+  return P.join('\n\n');
+}
+
+/* ---------- apresentação ---------- */
+function msg(t, cls){ var el=$('msgLoc'); el.textContent=t||''; el.className='msg'+(cls?' '+cls:''); }
+function renderReadout(){
+  var el = $('readout'), d = dk();
+  $('lUtm').textContent = 'UTM no sistema escolhido ('+DATUMS[d].nome+')';
+  if(!S.main){ el.textContent='Ainda sem local. Toca no mapa, cola coordenadas ou usa o GPS.'; return; }
+  var p=S.main, z=zoneNow(), u=utmFromWgs(p.lat,p.lon,z,d);
+  el.innerHTML = '<div><b>WGS 84</b>'+p.lat.toFixed(6)+', '+p.lon.toFixed(6)+'</div>'
+    +'<div><b>GMS WGS 84</b>'+esc(toDMS(p.lat,true))+' '+esc(toDMS(p.lon,false))+'</div>'
+    +(d!=='wgs84'?'<div><b>GMS '+DATUMS[d].nome+'</b>'+esc(toDMS(u.glat,true))+' '+esc(toDMS(u.glon,false))+'</div>':'')
+    +'<div><b>UTM '+z+'S</b>E '+u.e.toFixed(2)+'  N '+u.n.toFixed(2)+'</div>'
+    +(p.acc?'<div><b>Precisão GPS</b>±'+Math.round(p.acc)+' m</div>':'');
+}
+function renderLists(){
+  var h='';
+  S.refs.forEach(function(r,i){
+    h += '<div class="li"><span class="tag">R'+(i+1)+'</span><input type="text" data-ri="'+i+'" value="'+esc(r.nome)+'" placeholder="Ex.: Escola, mercado, rua principal" aria-label="Nome de R'+(i+1)+'"><button type="button" data-rdel="'+i+'" aria-label="Remover R'+(i+1)+'">✕</button></div>';
+  });
+  $('refList').innerHTML = h || '<p class="hint">Sem pontos de referência.</p>';
+  h='';
+  S.poly.forEach(function(p,i){
+    h += '<div class="li"><span class="tag">V'+(i+1)+'</span><span class="coord">'+p.lat.toFixed(6)+', '+p.lon.toFixed(6)+'</span><button type="button" data-pdel="'+i+'" aria-label="Remover V'+(i+1)+'">✕</button></div>';
+  });
+  $('polyList').innerHTML = h || '<p class="hint">Sem vértices.</p>';
+  renderReadout();
+}
+function renderAreaOut(){
+  var ai = areaInfo(), el = $('areaOut');
+  if(!ai){ el.textContent = S.poly.length ? 'Marca pelo menos 3 vértices para calcular a área.' : 'Sem área definida.'; return; }
+  el.innerHTML = '<div><b>Área</b>'+fmt(ai.area,1)+' m² ('+ai.src+')</div>'+(ai.perim?'<div><b>Perímetro</b>'+fmt(ai.perim,1)+' m</div>':'')+'<div><b>Vértices</b>'+S.poly.length+'</div>';
+}
+function kv(rows){
+  rows = rows.filter(function(r){ return r[1]; });
+  if(!rows.length) return '<p class="empty">Sem dados preenchidos.</p>';
+  return '<table>'+rows.map(function(r){ return '<tr><td class="k">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'; }).join('')+'</table>';
+}
+function renderSheet(){
+  var m = MODELOS[v('modelo')] || MODELOS.outro, d = dk(), f = v('formato')==='simples' ? 'simples' : 'topo', topo = (f==='topo'), n = 1, z = zoneNow();
+  var wasFmt = $('sheet').getAttribute('data-fmt');
+  $('sheet').setAttribute('data-fmt', f);
+  $('lEnt').textContent = m.ent; $('lResp').textContent = m.resp;
+  $('sCab').innerHTML = esc(v('cab')).replace(/\n/g,'<br>'); $('sCab').style.display = v('cab') ? '' : 'none';
+  $('sTitulo').textContent = m.titulo;
+  $('sSub').textContent = v('ent');
+
+  $('blkId').style.display = topo ? 'none' : '';
+  $('hMapa').style.display = topo ? 'none' : '';
+  $('blkCarimbo').style.display = topo ? '' : 'none';
+  $('blkSign').style.display = topo ? 'none' : '';
+  $('hId').textContent = (n++)+'. Identificação e localização';
+  $('sId').innerHTML = kv([[m.ent, v('ent')], [m.resp, v('resp')], ['BI / NIF', v('bi')], ['Contacto', v('tel')],
+    ['Fins', v('finalidade')], ['Endereço', v('rua')], ['Bairro', v('bairro')], ['Distrito / Comuna', v('distrito')], ['Município', v('mun')], ['Província', v('prov')], ['País','Angola']]);
+  $('hMapa').textContent = (n++)+'. Croqui de localização';
+
+  var lg = '<span><i class="lg-pin"></i>Local</span>';
+  if(S.refs.length) lg += '<span><i class="lg-ref"></i>Pontos de referência (R)</span>';
+  if(S.poly.length) lg += '<span><i class="lg-poly"></i>Limites (V = vértices)</span>';
+  lg += '<span>Escala aprox. '+(v('escala')||escalaAuto())+'</span><span>Base: '+(baseName==='sat'?'imagem de satélite':'mapa OpenStreetMap')+'</span>';
+  if($('grid').checked) lg += '<span>Quadrícula UTM em metros ('+DATUMS[d].nome+', zona '+z+'S)</span>';
+  $('sLegend').innerHTML = lg;
+
+  var rows = [], showT = $('tabela').checked && (S.main || S.poly.length || S.refs.length);
+  function row(tag, desc, p){
+    var u=utmFromWgs(p.lat,p.lon,z,d);
+    return '<tr><td><b>'+tag+'</b></td><td class="n">'+u.n.toFixed(2)+'</td><td class="n">'+u.e.toFixed(2)+'</td><td class="n">'+esc(toDMS(u.glat,true))+'</td><td class="n">'+esc(toDMS(u.glon,false))+'</td><td>'+esc(desc)+'</td></tr>';
+  }
+  if(S.main) rows.push(row('Local','Ponto central',S.main));
+  S.poly.forEach(function(p,i){ rows.push(row(String(i+1),'v'+(i+1),p)); });
+  S.refs.forEach(function(r,i){ rows.push(row('R'+(i+1),(r.nome||'Referência')+(S.main?' (≈ '+fmt(haversine(S.main,r),0)+' m)':''),r)); });
+  $('sCoordsWrap').style.display = showT ? '' : 'none';
+  if(showT){
+    $('hCoords').textContent = (n++)+'. Quadro de coordenadas'; $('hCoords').style.display = topo ? 'none' : '';
+    $('datumTxt').textContent = 'Sistema de Coordenadas '+DATUMS[d].txt+' · Projeção Mercator Transversal (UTM) – Zona '+z+'S';
+    $('sCoords').innerHTML = '<table><tr><th>Ponto</th><th>Norte</th><th>Este</th><th>Latitude</th><th>Longitude</th><th>Descrição</th></tr>'+rows.join('')+'</table>';
+  }
+
+  /* carimbo */
+  var ai = areaInfo(), t = tec(), loc2 = [];
+  $('cbProp').textContent = v('ent');
+  $('cbEsc').textContent = 'Escala: '+(v('escala')||escalaAuto());
+  $('cbFolha').textContent = v('folha') ? 'Folha N.º '+v('folha') : '';
+  $('cbAreaPer').innerHTML = ai ? 'Área = '+esc(fmt(ai.area,1))+' m²<br>Perímetro = '+(ai.perim?esc(fmt(ai.perim,1))+' m':'—') : '';
+  var l1 = [v('bairro')?'Bairro: '+v('bairro'):'', v('distrito')?'Distrito: '+v('distrito'):''].filter(Boolean).join(', ');
+  if(v('mun')) loc2.push('Município de '+v('mun')); if(v('prov')) loc2.push('Província de '+v('prov'));
+  $('cbLoc').innerHTML = esc(l1)+(l1&&loc2.length?'<br>':'')+esc(loc2.join(' – '));
+  $('cbCont').textContent = m.titulo;
+  $('cbFins').textContent = v('finalidade') ? 'Fins: '+v('finalidade') : '';
+  $('cbReg').innerHTML = esc(v('registo')) || '&nbsp;';
+  $('cbEsp').textContent = v('espec') || 'TOPOGRAFIA';
+  $('cbDes').textContent = v('desenho') || '1';
+  $('cbTecnico').innerHTML = (t.nome?'<b>'+esc(t.nome)+'</b><br>':'')+(t.reg?'N.º de registo: '+esc(t.reg):'')+((!t.nome&&!t.reg)?'&nbsp;':'');
+  var labs = ['Campo','Proj.','Des.','Verif.'];
+  $('cbTec').innerHTML = labs.map(function(l,i){ return '<tr><td class="l">'+l+'</td><td>'+esc(v('cp'+(i+1)+'d'))+'</td><td>'+esc(v('cp'+(i+1)+'n'))+'</td></tr>'; }).join('');
+  $('planta').innerHTML = plantaSvg();
+
+  /* memória */
+  $('blkMem').style.display = $('memShow').checked ? '' : 'none';
+  $('hMem').textContent = topo ? 'Memória descritiva' : (n++)+'. Memória descritiva';
+  var txt = $('mem').value.trim();
+  $('sMem').innerHTML = txt ? txt.split(/\n{2,}/).map(function(p){ return '<p>'+esc(p).replace(/\n/g,'<br>')+'</p>'; }).join('') : '<p class="empty">Sem texto.</p>';
+
+  /* assinatura (formato simples) */
+  $('sDate').textContent = [v('local'), v('data')].filter(Boolean).join(', ');
+  $('sElab').innerHTML = esc(t.nome) || '&nbsp;';
+  $('sQual').textContent = t.reg ? 'N.º de registo: '+t.reg : '';
+  $('sResp').innerHTML = esc(v('resp')) || '&nbsp;';
+  $('sRespL').textContent = m.resp;
+
+  if(wasFmt !== f){ setTimeout(function(){ map.invalidateSize(); updateInset(); drawGrid(); }, 60); }
+}
+function renderOutputs(){
+  readShift();
+  redrawLayers(); drawGrid();
+  renderReadout(); renderAreaOut();
+  if(autoMem) $('mem').value = buildMem();
+  renderSheet();
+  scheduleSave();
+}
+
+/* ---------- guardar ---------- */
+var FIELDS = ['modelo','formato','datum','dx','dy','dz','finalidade','cab','ent','resp','bi','tel','rua','bairro','distrito','mun','prov',
+  'areaMan','limN','limS','limE','limO','tecModo','elab','qual','folha','escala','registo','desenho','espec',
+  'cp1d','cp1n','cp2d','cp2n','cp3d','cp3n','cp4d','cp4n','local','data'];
+var CHECKS = ['nota','tabela','grid','memShow'];
+function getState(){
+  var f = {}; FIELDS.forEach(function(id){ f[id] = $(id).value; });
+  var c = {}; CHECKS.forEach(function(id){ c[id] = $(id).checked; });
+  var ct = map.getCenter();
+  return {f:f, c:c, mem:$('mem').value, autoMem:autoMem, main:S.main, refs:S.refs, poly:S.poly,
+          view:{lat:ct.lat, lon:ct.lng, zoom:map.getZoom()}, base:baseName};
+}
+function setState(st){
+  FIELDS.forEach(function(id){ if(st.f && st.f[id]!=null) $(id).value = st.f[id]; });
+  CHECKS.forEach(function(id){ if(st.c && st.c[id]!=null) $(id).checked = !!st.c[id]; });
+  S.main = st.main || null; S.refs = st.refs || []; S.poly = st.poly || [];
+  autoMem = st.autoMem!==false; lastModel = v('modelo') || 'igreja';
+  if(!autoMem) $('mem').value = st.mem || '';
+  if(st.base==='sat' && activeBase!==baseSat){ map.removeLayer(baseOSM); baseSat.addTo(map); activeBase = baseSat; baseName='sat'; }
+  if(st.base!=='sat' && activeBase!==baseOSM){ map.removeLayer(baseSat); baseOSM.addTo(map); activeBase = baseOSM; baseName='osm'; }
+  if(st.view) map.setView([st.view.lat, st.view.lon], st.view.zoom);
+  renderLists(); renderOutputs();
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){ try{ localStorage.setItem('croqui-rascunho-v2', JSON.stringify(getState())); }catch(e){} }, 500);
+}
+function readProj(){ try{ return JSON.parse(localStorage.getItem('croqui-projetos-v2')||'{}'); }catch(e){ return {}; } }
+function writeProj(o){ try{ localStorage.setItem('croqui-projetos-v2', JSON.stringify(o)); return true; }catch(e){ return false; } }
+function renderSaved(){
+  var o = readProj(), names = Object.keys(o), h = '';
+  names.forEach(function(nm,i){
+    h += '<div class="li"><span class="coord">'+esc(nm)+'</span><button type="button" class="sm" data-open="'+i+'">Abrir</button><button type="button" class="sm" data-del="'+i+'" aria-label="Apagar '+esc(nm)+'">✕</button></div>';
+  });
+  $('saved').innerHTML = h || '<p class="hint">Ainda não guardaste nenhum croqui.</p>';
+}
+
+/* ---------- impressão ---------- */
+function printNow(){
+  document.body.classList.add('printing');
+  window.scrollTo(0,0);
+  setTimeout(function(){
+    map.invalidateSize(); updateInset(); drawGrid();
+    var done = false;
+    function go(){ if(done) return; done = true; setTimeout(function(){ window.print(); }, 300); }
+    activeBase.once('load', go);
+    setTimeout(go, 3000);
+  }, 200);
+}
+function endPrint(){ document.body.classList.remove('printing'); setTimeout(function(){ map.invalidateSize(); updateInset(); }, 100); }
+
+/* ---------- arranque ---------- */
+function init(){
+  var sel = $('modelo');
+  Object.keys(MODELOS).forEach(function(k){ var o=document.createElement('option'); o.value=k; o.textContent=MODELOS[k].nome; sel.appendChild(o); });
+  $('finalidade').value = MODELOS.igreja.fin;
+  $('data').value = new Date().toLocaleDateString('pt-PT',{day:'numeric', month:'long', year:'numeric'});
+  initMap(); setMode('main');
+  var draft = null;
+  try{ draft = JSON.parse(localStorage.getItem('croqui-rascunho-v2')||'null'); }catch(e){}
+  if(draft) setState(draft); else { renderLists(); renderOutputs(); }
+  renderSaved();
+  setTimeout(function(){ map.invalidateSize(); updateInset(); drawGrid(); }, 400);
+
+  $('dados').addEventListener('input', function(e){
+    var t = e.target;
+    if(t.hasAttribute('data-ri')){ S.refs[+t.getAttribute('data-ri')].nome = t.value; renderOutputs(); return; }
+    if(t.id==='mem'){ autoMem = false; renderSheet(); scheduleSave(); return; }
+    if(t.hasAttribute('data-f')) renderOutputs();
+  });
+  $('dados').addEventListener('change', function(e){
+    var t = e.target;
+    if(t.id==='modelo'){
+      var oldFin = MODELOS[lastModel] ? MODELOS[lastModel].fin : '';
+      if(!v('finalidade') || v('finalidade')===oldFin) $('finalidade').value = (MODELOS[v('modelo')]||{}).fin || '';
+      lastModel = v('modelo'); renderOutputs();
+    } else if(t.type==='checkbox'){ renderOutputs(); }
+  });
+  $('dados').addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('button') : e.target;
+    if(!t) return;
+    if(t.hasAttribute('data-rdel')){ S.refs.splice(+t.getAttribute('data-rdel'),1); renderLists(); renderOutputs(); }
+    else if(t.hasAttribute('data-pdel')){ S.poly.splice(+t.getAttribute('data-pdel'),1); renderLists(); renderOutputs(); }
+    else if(t.hasAttribute('data-open')){ var o=readProj(), nm=Object.keys(o)[+t.getAttribute('data-open')]; if(nm){ setState(o[nm]); $('projNome').value=nm; msg('Croqui aberto: '+nm,'ok'); } }
+    else if(t.hasAttribute('data-del')){ var o2=readProj(), nm2=Object.keys(o2)[+t.getAttribute('data-del')]; if(nm2 && confirm('Apagar o croqui "'+nm2+'"?')){ delete o2[nm2]; writeProj(o2); renderSaved(); } }
+  });
+  $('modes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-mode]'); if(b) setMode(b.getAttribute('data-mode'));
+  });
+  $('btnFit').addEventListener('click', fitAll);
+  $('btnUndo').addEventListener('click', function(){ S.poly.pop(); renderLists(); renderOutputs(); });
+  $('btnClearPoly').addEventListener('click', function(){ if(!S.poly.length || confirm('Apagar todos os vértices?')){ S.poly=[]; renderLists(); renderOutputs(); } });
+  $('btnMemAuto').addEventListener('click', function(){ autoMem = true; renderOutputs(); });
+  $('btnCopiaTec').addEventListener('click', function(){
+    var n = v('elab'), d = todayDots();
+    [1,2,3,4].forEach(function(i){ $('cp'+i+'n').value = n; $('cp'+i+'d').value = d; });
+    renderOutputs();
+  });
+
+  var LINK_CURTO = 'Não consegui abrir este link curto. Abre-o no Google Maps, toca no pin, copia as coordenadas que aparecem (ou o endereço completo do navegador) e cola aqui.';
+  function fetchJson(u, ms){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, ms);
+    return fetch(u, {signal: ctl.signal}).then(function(r){ clearTimeout(t); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); },
+      function(e){ clearTimeout(t); throw e; });
+  }
+  function resolveShort(url){
+    return fetchJson('https://api.allorigins.win/get?url='+encodeURIComponent(url), 15000).then(function(j){
+      var fin = (j && j.status && j.status.url) || '';
+      return parseMapsUrl(fin, refPoint()) || parseMapsUrl(String((j && j.contents) || ''), refPoint());
+    }).catch(function(){ return null; });
+  }
+  function aplicarLoc(p, origem){
+    if(!p || !isFinite(p.lat) || !isFinite(p.lon) || Math.abs(p.lat)>90 || Math.abs(p.lon)>180){ msg('Não consegui ler as coordenadas. Confirma o formato.','bad'); return; }
+    setMain(p.lat, p.lon, {center:true, zoom:18});
+    if(!inAngola(p)) msg('Local marcado, mas fica fora de Angola. Confirma se o link ou a latitude e a longitude estão certos.','bad');
+    else msg('Local marcado no mapa'+(origem?' ('+origem+')':'')+'.','ok');
+  }
+  $('btnColar').addEventListener('click', function(){
+    var txt = $('colar').value.trim();
+    var um = /https?:\/\/\S+/i.exec(txt);
+    if(um){
+      var url = um[0], p = parseMapsUrl(url, refPoint());
+      if(p){ aplicarLoc(p, 'link do Google Maps'); return; }
+      if(/maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs/i.test(url)){
+        msg('A abrir o link curto…');
+        resolveShort(url).then(function(p2){ if(p2) aplicarLoc(p2, 'link do Google Maps'); else msg(LINK_CURTO,'bad'); });
+        return;
+      }
+      msg('Não encontrei coordenadas neste link. Pede ao cliente para enviar a localização pelo WhatsApp ou abre o link e copia as coordenadas.','bad');
+      return;
+    }
+    aplicarLoc(parseCoords(txt, refPoint()), '');
+  });
+  $('btnEnd').addEventListener('click', function(){
+    if(!S.main){ msg('Marca primeiro o local no mapa.','bad'); return; }
+    msg('A procurar o endereço…');
+    fetchJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=pt&zoom=18&lat='+S.main.lat+'&lon='+S.main.lon, 15000).then(function(j){
+      var a = (j && j.address) || {}, got = 0;
+      function put(id, val){ if(val && !v(id)){ $(id).value = val; got++; } }
+      put('rua', a.road || a.pedestrian || a.footway || '');
+      put('bairro', a.neighbourhood || a.quarter || a.suburb || a.hamlet || a.village || '');
+      put('distrito', (a.neighbourhood || a.quarter) ? (a.suburb || '') : (a.city_district || ''));
+      put('mun', a.county || a.municipality || a.city || a.town || '');
+      put('prov', (a.state || '').replace(/^Província (de |do |da )?/i,'').replace(/ Province$/i,''));
+      renderOutputs();
+      msg(got ? 'Endereço sugerido pelo OpenStreetMap. Confirma e corrige o que for preciso.' : 'Não encontrei endereço para este ponto (ou os campos já estão preenchidos).', got ? 'ok' : 'bad');
+    }).catch(function(){ msg('Não consegui procurar o endereço agora. Preenche à mão.','bad'); });
+  });
+  $('colar').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); $('btnColar').click(); } });
+  $('btnUtm').addEventListener('click', function(){
+    readShift();
+    var e=num($('utmE').value), n=num($('utmN').value), z=parseInt($('utmZ').value,10);
+    if(!isFinite(e)||!isFinite(n)||!(z>=1&&z<=60)){ msg('Preenche E, N e a zona UTM.','bad'); return; }
+    var p = wgsFromUtm(e,n,z,dk());
+    if(!isFinite(p.lat)||Math.abs(p.lat)>90){ msg('Valores UTM inválidos.','bad'); return; }
+    setMain(p.lat,p.lon,{center:true, zoom:18}); msg('Local marcado a partir do UTM ('+DATUMS[dk()].nome+').','ok');
+  });
+  $('btnGps').addEventListener('click', function(){
+    if(!navigator.geolocation){ msg('Este navegador não tem GPS.','bad'); return; }
+    msg('A obter o GPS… fica parada no local.');
+    navigator.geolocation.getCurrentPosition(function(pos){
+      setMain(pos.coords.latitude, pos.coords.longitude, {center:true, zoom:18, acc:pos.coords.accuracy});
+      msg('GPS aplicado. Precisão ±'+Math.round(pos.coords.accuracy)+' m.','ok');
+    }, function(){ msg('Não consegui o GPS. Ativa a localização e permite o acesso.','bad'); }, {enableHighAccuracy:true, timeout:25000, maximumAge:0});
+  });
+
+  $('btnSave').addEventListener('click', function(){
+    var nm = $('projNome').value.trim() || v('ent');
+    if(!nm){ msg('Escreve um nome para guardar.','bad'); $('projNome').focus(); return; }
+    var o = readProj(); o[nm] = getState();
+    if(writeProj(o)){ $('projNome').value = nm; renderSaved(); msg('Guardado: '+nm,'ok'); } else msg('Não consegui guardar neste navegador.','bad');
+  });
+  $('btnNew').addEventListener('click', function(){
+    if(!confirm('Começar um croqui novo? O que está no ecrã deixa de estar aqui (os guardados mantêm-se).')) return;
+    S = {main:null, refs:[], poly:[]};
+    ['ent','resp','bi','tel','rua','bairro','distrito','mun','areaMan','limN','limS','limE','limO','elab','qual','folha','escala','registo','cab','colar','projNome',
+     'cp1d','cp1n','cp2d','cp2n','cp3d','cp3n','cp4d','cp4n'].forEach(function(id){ $(id).value=''; });
+    $('prov').value='Luanda'; $('modelo').value='igreja'; lastModel='igreja'; $('finalidade').value=MODELOS.igreja.fin;
+    $('desenho').value='1'; $('espec').value='TOPOGRAFIA'; autoMem=true;
+    map.setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lon], DEFAULT_VIEW.zoom);
+    renderLists(); renderOutputs(); window.scrollTo(0,0);
+  });
+
+  $('btnPrint').addEventListener('click', printNow);
+  $('btnBack').addEventListener('click', endPrint);
+  window.addEventListener('afterprint', endPrint);
+}
+init();
+})();
+</script>
+</body>
+</html>
